@@ -4285,6 +4285,8 @@ export type BuildDTO = {
   /** @format int32 */
   exit_code?: number | null
   id: string
+  /** Explicit log path for this build (target-scoped) */
+  log_path: string
   output_file: string
   repo: string
   start_at: string

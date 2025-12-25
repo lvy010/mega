@@ -4299,6 +4299,8 @@ export type BuildRequest = {
   args?: any[] | null
   buck_hash: string
   buckconfig_hash: string
+  /** Optional explicit buck2 target label for this build unit */
+  target?: string | null
 }
 
 /** Log segment read result */
@@ -4340,6 +4342,10 @@ export type TaskInfoDTO = {
   /** @format int64 */
   cl_id: number
   created_at: string
+  /** Aggregated CL-level status derived from all builds */
+  status: TaskStatusEnum
+  /** Indicates at least one build succeeded while others are running or failed */
+  partial_success: boolean
   task_id: string
   task_name?: string | null
   template?: any
@@ -4361,6 +4367,7 @@ export enum TaskStatusEnum {
   Pending = 'Pending',
   Building = 'Building',
   Interrupted = 'Interrupted',
+  Canceled = 'Canceled',
   Failed = 'Failed',
   Completed = 'Completed',
   NotFound = 'NotFound'

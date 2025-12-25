@@ -307,6 +307,7 @@ pub async fn build(
     id: String,
     repo: String,
     cl: String,
+    target: Option<String>,
     sender: UnboundedSender<WSMessage>,
     changes: Vec<Status<ProjectRelativePath>>,
 ) -> Result<ExitStatus, Box<dyn Error + Send + Sync>> {
@@ -314,7 +315,14 @@ pub async fn build(
 
     mount_fs(&repo, Some(&cl), Some(sender.clone()), Some(id.clone())).await?;
     mount_fs(&repo, None, Some(sender.clone()), Some(id.clone())).await?;
-    let targets = get_build_targets(&repo, &cl, changes).await?;
+    // Decide targets: use explicit target if provided, otherwise run change detection.
+    let targets = match target {
+        Some(t) => {
+            let label = TargetLabel::new(&t);
+            vec![label]
+        }
+        None => get_build_targets(&repo, &cl, changes).await?,
+    };
 
     tracing::info!("[Task {}] Filesystem mounted successfully.", id);
 

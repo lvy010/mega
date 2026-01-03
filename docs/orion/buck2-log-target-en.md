@@ -4,24 +4,32 @@
 
 This design uses independent Buck2 builds for each target, generating dedicated log files to achieve natural multi-target log isolation. The scheduler aggregates states and results at the Task level for CL-level status summary. The solution directly reuses existing REST/WebSocket interfaces, enabling the frontend to access real-time target-level status and log information.
 
-- CL -> Task (one commit corresponds to one task record)
-- Task contains multiple Builds (corresponding to a single Buck2 target or build units automatically parsed from changes)
-- Logs and states are isolated at Build granularity, with Task-level aggregated overall status
+- **CL (Change List)** -> **Task** (1:N): One code change can submit multiple tasks (retry, add new targets, etc.)
+- **Task** -> **Build** (1:N): One task submission can contain multiple Builds, each corresponding to a Buck2 target
+- **Log Isolation**: Isolated at Build granularity, with Task-level aggregated overall status
+- **Target Distinction**: Identified by Build's `target` field for specific build targets
 
 ```
-CL
-└── Task (Build Session)
-    ├── Build / Target A
-    │   ├── Status/start-end time/exit_code/target
-    │   ├── Log: {task_id}/{repo_segment}/{build_id}.log  (BuildDTO.log_path)
-    │   └── API: /task-output/{build_id} /task-history-output
-    ├── Build / Target B
-    │   ├── Status/start-end time/exit_code/target
-    │   ├── Log: {task_id}/{repo_segment}/{build_id}.log
-    │   └── API: same as above
-    └── Build / Target C
-        ├── Status/start-end time/exit_code/target
-        ├── Log: {task_id}/{repo_segment}/{build_id}.log
+CL (cl_id: 123)
+│
+├── Task 1 (task_id: 01JN1111-...) ← First submission
+│   ├── Build A (build_id: 01JN2222-..., target: "//app:libA")
+│   │   ├── Status: Completed, exit_code: 0
+│   │   ├── Log: {task_id}/repo/{build_id}.log
+│   │   └── API: /task-output/{build_id}, /task-history-output
+│   ├── Build B (build_id: 01JN3333-..., target: "//app:libB")
+│   │   ├── Status: Building, exit_code: null
+│   │   ├── Log: {task_id}/repo/{build_id}.log
+│   │   └── API: same as above
+│   └── Build C (build_id: 01JN4444-..., target: "//app:libC")
+│       ├── Status: Failed, exit_code: 1
+│       ├── Log: {task_id}/repo/{build_id}.log
+│       └── API: same as above
+│
+└── Task 2 (task_id: 01JN5555-...) ← Retry libC or add new target
+    └── Build C' (build_id: 01JN6666-..., target: "//app:libC")
+        ├── Status: Completed, exit_code: 0
+        ├── Log: {task_id}/repo/{build_id}.log (new log file)
         └── API: same as above
 ```
 

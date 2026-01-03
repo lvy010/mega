@@ -4,25 +4,33 @@
 
 采用每个 target 独立触发 Buck2 构建并生成专属日志文件的方案，天然实现多 target 日志隔离。调度器在 Task 层聚合各 target 的状态和结果，完成 CL 级状态汇总。直接复用现有 REST/WS 接口，前端能够获取 target 级的实时状态与日志信息。
 
-- CL -> Task (一次提交对应一个任务记录)
-- Task 下包含多个 Build（对应单个 Buck2 target 或按变更自动解析的构建单元）。
-- 日志与状态以 Build 为粒度隔离，Task 级别通过聚合得到总体状态。
+- **CL (Change List)** -> **Task** (1:N)：一个代码变更可多次提交任务（重试、新增 target 等）
+- **Task** -> **Build** (1:N)：一次任务提交可包含多个 Build，每个对应一个 Buck2 target
+- **日志隔离**：以 Build 为粒度隔离，Task 级别通过聚合得到总体状态
+- **Target 区分**：通过 Build 的 `target` 字段标识具体构建目标
 
 ```
-CL
-└── Task (Build Session)
-    ├── Build / Target A
-    │   ├── 状态/起止时间/exit_code/target
-    │   ├── 日志：{task_id}/{repo_segment}/{build_id}.log  (BuildDTO.log_path)
-    │   └── 接口：/task-output/{build_id} /task-history-output
-    ├── Build / Target B
-    │   ├── 状态/起止时间/exit_code/target
-    │   ├── 日志：{task_id}/{repo_segment}/{build_id}.log
-    │   └── 接口：同上
-    └── Build / Target C
-        ├── 状态/起止时间/exit_code/target
-        ├── 日志：{task_id}/{repo_segment}/{build_id}.log
-        └── 接口：同上
+CL (cl_id: 123)
+│
+├── Task 1 (task_id: 01JN1111-...) ← 第一次提交
+│   ├── Build A (build_id: 01JN2222-..., target: "//app:libA")
+│   │   ├── 状态: Completed, exit_code: 0
+│   │   ├── 日志: {task_id}/repo/{build_id}.log
+│   │   └── 接口: /task-output/{build_id}, /task-history-output
+│   ├── Build B (build_id: 01JN3333-..., target: "//app:libB")
+│   │   ├── 状态: Building, exit_code: null
+│   │   ├── 日志: {task_id}/repo/{build_id}.log
+│   │   └── 接口: 同上
+│   └── Build C (build_id: 01JN4444-..., target: "//app:libC")
+│       ├── 状态: Failed, exit_code: 1
+│       ├── 日志: {task_id}/repo/{build_id}.log
+│       └── 接口: 同上
+│
+└── Task 2 (task_id: 01JN5555-...) ← 重试 libC 或新增 target
+    └── Build C' (build_id: 01JN6666-..., target: "//app:libC")
+        ├── 状态: Completed, exit_code: 0
+        ├── 日志: {task_id}/repo/{build_id}.log (新的日志文件)
+        └── 接口: 同上
 ```
 
 说明：
